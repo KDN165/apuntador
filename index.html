@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F3864">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Apuntador">
+<title>Apuntador · Descarga / Carga</title>
+<style>
+  /* ── Paleta: la de la plantilla en papel + el azul y el amarillo de Mi ESTIBA ── */
+  :root {
+    --azul: #1F3864;
+    --azul-claro: #3457ED;
+    --amarillo: #F6C700;
+    --gris-grupo: #DBDBDB;
+    --gris-cols: #EDEDED;
+    --linea: #8C8C8C;
+    --linea-fuerte: #000;
+    --fondo: #F4F5F7;
+    --texto: #111;
+    --pie-alto: 150px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fondo); color: var(--texto);
+    display: flex; flex-direction: column; min-height: 100dvh;
+    padding-bottom: calc(var(--pie-alto) + env(safe-area-inset-bottom));
+    user-select: none; -webkit-user-select: none;
+  }
+
+  /* ── Cabecera ── */
+  header { background: var(--azul); color: #fff; padding: env(safe-area-inset-top) 12px 8px; }
+  .barra { display: flex; align-items: center; justify-content: space-between; height: 46px; }
+  .barra h1 { font-size: 18px; letter-spacing: .5px; margin: 0; font-weight: 700; }
+  .barra .resumen { font-size: 13px; opacity: .9; max-width: 55%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .barra button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  .datos { display: none; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 8px; }
+  .datos.abierto { display: grid; }
+  .datos label { font-size: 11px; font-weight: 700; letter-spacing: .4px; opacity: .85; display: block; margin-bottom: 2px; }
+  .datos input, .datos select { width: 100%; font-size: 16px; padding: 8px; border: 0; border-radius: 6px; background: #fff; color: var(--texto); }
+  .datos .ancho { grid-column: 1 / -1; }
+
+  /* ── Pestañas DESCARGA / CARGA ── */
+  nav.tabs { display: flex; background: var(--gris-grupo); border-bottom: 2px solid var(--linea-fuerte); }
+  nav.tabs button {
+    flex: 1; padding: 10px 4px; font-size: 16px; font-weight: 700; letter-spacing: .5px;
+    background: transparent; border: 0; border-bottom: 4px solid transparent; color: #555;
+  }
+  nav.tabs button.activo { color: var(--texto); border-bottom-color: var(--amarillo); background: #fff; }
+  nav.tabs button small { display: block; font-size: 12px; font-weight: 600; color: #666; }
+
+  /* ── Tabla ── */
+  main { flex: 1; overflow: auto; background: #fff; }
+  table.tabla { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
+  table.tabla th, table.tabla td { border-right: 1px solid var(--linea); border-bottom: 1px solid var(--linea); text-align: center; }
+  table.tabla th.nro, table.tabla td.nro { width: 34px; font-size: 11px; color: #444; background: #fafafa; }
+  thead th { position: sticky; z-index: 2; }
+  thead tr.cols th { top: 0; height: 36px; font-size: 10.5px; line-height: 1.1; background: var(--gris-cols); border-bottom: 2px solid var(--linea-fuerte); }
+  thead tr.total th, thead tr.total td { position: sticky; top: 36px; z-index: 2; height: 40px; font-size: 18px; font-weight: 800; background: var(--gris-cols); border-bottom: 2px solid var(--linea-fuerte); }
+  thead tr.total th.nro { font-size: 9px; letter-spacing: .3px; }
+  tbody td.celda { height: 46px; font-size: 19px; font-weight: 700; cursor: pointer; }
+  tbody td.celda:empty::after { content: ""; }
+  tbody td.celda.sel { outline: 3px solid var(--amarillo); outline-offset: -3px; background: #FFFBE6; }
+  tbody td.nro { cursor: pointer; }
+  tbody td.nro .etq { display: block; font-size: 10px; font-weight: 700; color: var(--azul-claro); white-space: nowrap; overflow: hidden; }
+
+  /* ── Teclado inferior ── */
+  footer.teclado {
+    position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--pie-alto) + env(safe-area-inset-bottom));
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: #fff; border-top: 2px solid var(--linea-fuerte);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .seleccion { font-size: 13px; color: #333; height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seleccion b { color: var(--azul); }
+  .botones { display: grid; grid-template-columns: 1fr 1.6fr 1fr 1fr 1fr 1fr; gap: 6px; }
+  .botones button {
+    height: 50px; font-size: 20px; font-weight: 800; border-radius: 10px; border: 1px solid #bbb; background: #f7f7f7; color: var(--texto);
+  }
+  .botones button.mas { background: var(--amarillo); border-color: #d9b000; font-size: 24px; }
+  .botones button.menos { background: #ffe9e9; border-color: #e0a0a0; }
+  .botones button:active { transform: scale(.97); filter: brightness(.95); }
+  .botones button:disabled { opacity: .35; }
+  .acciones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .acciones button { height: 36px; font-size: 12.5px; font-weight: 700; border-radius: 8px; border: 1px solid var(--azul); background: #fff; color: var(--azul); padding: 0 2px; white-space: nowrap; }
+  .acciones button.principal { background: var(--azul); color: #fff; }
+
+  /* ── Historial (diálogo) ── */
+  dialog { border: 0; border-radius: 12px; padding: 0; width: min(92vw, 480px); max-height: 80vh; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dlg-cab { background: var(--azul); color: #fff; padding: 12px 14px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .dlg-cab button { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 6px; padding: 4px 10px; }
+  .dlg-cuerpo { padding: 10px 14px; overflow: auto; max-height: 60vh; font-size: 14px; }
+  .hist { border-bottom: 1px solid #ddd; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .hist .txt b { display: block; }
+  .hist .txt span { color: #555; font-size: 12px; }
+  .hist button { border: 1px solid var(--azul); background: #fff; color: var(--azul); border-radius: 6px; padding: 6px 8px; font-size: 12px; font-weight: 700; }
+  .vacio { color: #666; text-align: center; padding: 20px 0; }
+
+  /* ── Hoja para imprimir / PDF: la plantilla en papel, A4 apaisado ── */
+  #hoja { display: none; }
+  @media print {
+    @page { size: A4 landscape; margin: 9mm; }
+    body { padding: 0; background: #fff; display: block; }
+    header, nav.tabs, main, footer.teclado, dialog { display: none !important; }
+    #hoja { display: block; width: 279mm; font-family: Arial, Helvetica, sans-serif; color: #000; }
+    .h-datos { display: flex; gap: 3mm; height: 8.5mm; margin-bottom: 1.5mm; }
+    .h-datos div { border-bottom: .4pt solid #737373; display: flex; flex-direction: column; justify-content: space-between; }
+    .h-datos label { font-size: 7.5pt; font-weight: 700; color: #595959; }
+    .h-datos span { font-size: 11pt; padding-bottom: 1mm; min-height: 5mm; }
+    table.papel { border-collapse: collapse; width: 279mm; table-layout: fixed; border: 1.3pt solid #000; }
+    table.papel th, table.papel td { border: .5pt solid #4D4D4D; text-align: center; }
+    table.papel tr.grupo th { height: 8.5mm; font-size: 13pt; font-weight: 700; background: #DBDBDB; border-bottom: .9pt solid #000; }
+    table.papel tr.cols th { height: 7.5mm; font-size: 8.4pt; font-weight: 700; background: #EDEDED; border-bottom: .9pt solid #000; }
+    table.papel tr.fila td { height: 9.9mm; font-size: 12pt; border-bottom: .4pt solid #8C8C8C; }
+    table.papel tr.fila td small { font-size: 7pt; color: #3457ED; display: block; line-height: 1; }
+    table.papel tr.tot td { height: 10mm; font-size: 12pt; font-weight: 700; background: #EDEDED; border-top: .9pt solid #000; }
+    table.papel tr.tot td.etq { text-align: left; padding-left: 1.2mm; }
+    table.papel tr.tot td.etq small { font-size: 6.2pt; color: #666; margin-right: 2mm; vertical-align: top; }
+    table.papel .sep { border-left: 1.3pt solid #000 !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="barra">
+    <h1>APUNTADOR</h1>
+    <div class="resumen" id="resumen"></div>
+    <button id="btnDatos" type="button">Datos</button>
+  </div>
+  <div class="datos" id="datos">
+    <div class="ancho"><label for="buque">BUQUE</label><input id="buque" autocomplete="off" autocapitalize="characters"></div>
+    <div><label for="fecha">FECHA</label><input id="fecha" type="date"></div>
+    <div><label for="turno">TURNO</label>
+      <select id="turno">
+        <option value="">—</option>
+        <option>T1 (08-14)</option><option>T2 (14-20)</option><option>T3 (20-02)</option><option>T4 (02-08)</option>
+      </select></div>
+    <div><label for="mano">MANO / GRÚA</label><input id="mano" autocomplete="off"></div>
+    <div><label for="apuntador">APUNTADOR</label><input id="apuntador" autocomplete="off"></div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button type="button" data-bloque="descarga" class="activo">DESCARGA<small id="totDescarga">0 movimientos</small></button>
+  <button type="button" data-bloque="carga">CARGA<small id="totCarga">0 movimientos</small></button>
+</nav>
+
+<main>
+  <table class="tabla" id="tabla">
+    <thead>
+      <tr class="cols">
+        <th class="nro">#</th>
+        <th>CONTE-<br>NEDORES</th><th>TWIN</th><th>TAPAS</th><th>REMO-<br>CIONES</th><th>GANCHO</th><th>CAJO-<br>NERAS</th>
+      </tr>
+      <tr class="total">
+        <th class="nro">TOTAL</th>
+        <td data-tot="0"></td><td data-tot="1"></td><td data-tot="2"></td><td data-tot="3"></td><td data-tot="4"></td><td data-tot="5"></td>
+      </tr>
+    </thead>
+    <tbody id="cuerpo"></tbody>
+  </table>
+</main>
+
+<footer class="teclado">
+  <div class="seleccion" id="seleccion">Toca una celda para empezar</div>
+  <div class="botones">
+    <button type="button" class="menos" data-d="-1" id="bMenos">−1</button>
+    <button type="button" class="mas" data-d="1" id="bMas">+1</button>
+    <button type="button" data-d="5">+5</button>
+    <button type="button" data-d="10">+10</button>
+    <button type="button" id="bEscribir" title="Escribir una cantidad">123</button>
+    <button type="button" id="bBorrar" title="Vaciar la celda">⌫</button>
+  </div>
+  <div class="acciones">
+    <button type="button" id="bCompartir" class="principal">Compartir</button>
+    <button type="button" id="bPdf">PDF</button>
+    <button type="button" id="bHistorial">Historial</button>
+    <button type="button" id="bNuevo">Nuevo turno</button>
+  </div>
+</footer>
+
+<dialog id="dlgHistorial">
+  <div class="dlg-cab"><span>Turnos guardados</span><button type="button" id="bCerrarHist">Cerrar</button></div>
+  <div class="dlg-cuerpo" id="listaHist"></div>
+</dialog>
+
+<!-- Hoja A4 apaisada (solo al imprimir / guardar PDF): calca la plantilla en papel -->
+<section id="hoja"></section>
+
+<script>
+(function () {
+  'use strict';
+  const COLS = ['CONTENEDORES', 'TWIN', 'TAPAS', 'REMOCIONES', 'GANCHO', 'CAJONERAS'];
+  const COLS_CORTAS = ['Contenedores', 'Twin', 'Tapas', 'Remociones', 'Gancho', 'Cajoneras'];
+  const BLOQUES = ['descarga', 'carga'];
+  const FILAS = 15;
+  const K_ACTUAL = 'apuntador.v1.actual';
+  const K_HIST = 'apuntador.v1.historial';
+  const MAX_HIST = 30;
+
+  // ── Estado ────────────────────────────────────────────────────────────────
+  function turnoVacio() {
+    return {
+      datos: { buque: '', fecha: '', turno: '', mano: '', apuntador: '' },
+      descarga: Array.from({ length: FILAS }, () => Array(6).fill(0)),
+      carga: Array.from({ length: FILAS }, () => Array(6).fill(0)),
+      etiquetas: { descarga: Array(FILAS).fill(''), carga: Array(FILAS).fill('') },
+      creado: Date.now(),
+    };
+  }
+  function leer(clave, porDefecto) {
+    try { const v = localStorage.getItem(clave); return v ? JSON.parse(v) : porDefecto; } catch (e) { return porDefecto; }
+  }
+  function guardar(clave, valor) {
+    try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) { /* sin almacenamiento: la página sigue funcionando */ }
+  }
+  let turno = leer(K_ACTUAL, null) || turnoVacio();
+  // Compatibilidad con un estado guardado incompleto
+  if (!turno.etiquetas) turno.etiquetas = { descarga: Array(FILAS).fill(''), carga: Array(FILAS).fill('') };
+  let bloque = 'descarga';
+  let sel = null; // { fila, col }
+
+  const $ = (id) => document.getElementById(id);
+  const cuerpo = $('cuerpo');
+
+  // ── Tabla ────────────────────────────────────────────────────────────────
+  function construirTabla() {
+    const frag = document.createDocumentFragment();
+    for (let f = 0; f < FILAS; f++) {
+      const tr = document.createElement('tr');
+      const nro = document.createElement('td');
+      nro.className = 'nro'; nro.dataset.fila = f;
+      tr.appendChild(nro);
+      for (let c = 0; c < 6; c++) {
+        const td = document.createElement('td');
+        td.className = 'celda'; td.dataset.fila = f; td.dataset.col = c;
+        tr.appendChild(td);
+      }
+      frag.appendChild(tr);
+    }
+    cuerpo.appendChild(frag);
+  }
+
+  function pintar() {
+    const m = turno[bloque];
+    const etq = turno.etiquetas[bloque];
+    cuerpo.querySelectorAll('tr').forEach((tr, f) => {
+      const nro = tr.firstElementChild;
+      nro.innerHTML = (f + 1) + (etq[f] ? '<span class="etq"></span>' : '');
+      if (etq[f]) nro.querySelector('.etq').textContent = etq[f];
+      for (let c = 0; c < 6; c++) {
+        const td = tr.children[c + 1];
+        td.textContent = m[f][c] ? m[f][c] : '';
+        td.classList.toggle('sel', !!sel && sel.fila === f && sel.col === c);
+      }
+    });
+    const tot = totales(bloque);
+    document.querySelectorAll('[data-tot]').forEach((td) => { const v = tot[+td.dataset.tot]; td.textContent = v ? v : ''; });
+    $('totDescarga').textContent = suma(totales('descarga')) + ' movimientos';
+    $('totCarga').textContent = suma(totales('carga')) + ' movimientos';
+    document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.bloque === bloque));
+    pintarSeleccion();
+    pintarResumen();
+  }
+  function totales(b) {
+    const t = [0, 0, 0, 0, 0, 0];
+    turno[b].forEach((fila) => fila.forEach((v, c) => { t[c] += v; }));
+    return t;
+  }
+  const suma = (arr) => arr.reduce((a, b) => a + b, 0);
+
+  function pintarSeleccion() {
+    const el = $('seleccion');
+    const hay = !!sel;
+    ['bMenos', 'bMas', 'bEscribir', 'bBorrar'].forEach((id) => { $(id).disabled = !hay; });
+    document.querySelectorAll('.botones button[data-d]').forEach((b) => { b.disabled = !hay; });
+    if (!hay) { el.textContent = 'Toca una celda para empezar'; return; }
+    const etq = turno.etiquetas[bloque][sel.fila];
+    el.innerHTML = '<b></b> · fila <b></b> · <b></b> = <b></b>';
+    const bs = el.querySelectorAll('b');
+    bs[0].textContent = bloque.toUpperCase();
+    bs[1].textContent = (sel.fila + 1) + (etq ? ' (' + etq + ')' : '');
+    bs[2].textContent = COLS_CORTAS[sel.col];
+    bs[3].textContent = turno[bloque][sel.fila][sel.col];
+  }
+  function pintarResumen() {
+    const d = turno.datos;
+    const partes = [d.buque, fechaCorta(d.fecha), d.turno ? d.turno.split(' ')[0] : ''].filter(Boolean);
+    $('resumen').textContent = partes.join(' · ');
+  }
+  function fechaCorta(iso) {
+    if (!iso) return '';
+    const [a, m, d] = iso.split('-');
+    return d + '/' + m + '/' + a;
+  }
+
+  function persistir() { guardar(K_ACTUAL, turno); }
+
+  // ── Interacción con la tabla ──────────────────────────────────────────────
+  cuerpo.addEventListener('click', (ev) => {
+    const td = ev.target.closest('td');
+    if (!td) return;
+    const f = +td.dataset.fila;
+    if (td.classList.contains('nro')) {
+      const actual = turno.etiquetas[bloque][f];
+      const nuevo = prompt('Etiqueta de la fila ' + (f + 1) + ' (bodega, hora…):', actual);
+      if (nuevo !== null) { turno.etiquetas[bloque][f] = nuevo.trim().slice(0, 10); persistir(); pintar(); }
+      return;
+    }
+    const c = +td.dataset.col;
+    if (sel && sel.fila === f && sel.col === c) {
+      // segundo toque sobre la celda ya elegida = +1
+      cambiar(1);
+    } else {
+      sel = { fila: f, col: c };
+      pintar();
+    }
+  });
+
+  function cambiar(delta) {
+    if (!sel) return;
+    const v = Math.max(0, (turno[bloque][sel.fila][sel.col] || 0) + delta);
+    turno[bloque][sel.fila][sel.col] = v;
+    persistir(); pintar();
+  }
+  document.querySelectorAll('.botones button[data-d]').forEach((b) => {
+    b.addEventListener('click', () => cambiar(+b.dataset.d));
+  });
+  $('bEscribir').addEventListener('click', () => {
+    if (!sel) return;
+    const r = prompt('Cantidad de ' + COLS_CORTAS[sel.col].toLowerCase() + ' (fila ' + (sel.fila + 1) + '):', turno[bloque][sel.fila][sel.col] || '');
+    if (r === null) return;
+    const n = parseInt(String(r).replace(/[^\d]/g, ''), 10);
+    turno[bloque][sel.fila][sel.col] = isNaN(n) ? 0 : n;
+    persistir(); pintar();
+  });
+  $('bBorrar').addEventListener('click', () => {
+    if (!sel) return;
+    turno[bloque][sel.fila][sel.col] = 0;
+    persistir(); pintar();
+  });
+
+  document.querySelectorAll('nav.tabs button').forEach((b) => {
+    b.addEventListener('click', () => { bloque = b.dataset.bloque; sel = null; pintar(); });
+  });
+
+  // ── Datos del turno ───────────────────────────────────────────────────────
+  const campos = ['buque', 'fecha', 'turno', 'mano', 'apuntador'];
+  function cargarDatos() { campos.forEach((k) => { $(k).value = turno.datos[k] || ''; }); }
+  campos.forEach((k) => {
+    $(k).addEventListener('input', () => {
+      turno.datos[k] = k === 'buque' ? $(k).value.toUpperCase() : $(k).value;
+      if (k === 'buque') $(k).value = turno.datos[k];
+      persistir(); pintarResumen();
+    });
+  });
+  $('btnDatos').addEventListener('click', () => {
+    const abierto = $('datos').classList.toggle('abierto');
+    $('btnDatos').textContent = abierto ? 'Cerrar' : 'Datos';
+  });
+
+  // ── Compartir ─────────────────────────────────────────────────────────────
+  function textoResumen(t) {
+    const d = t.datos;
+    const cab = ['APUNTADOR', d.buque, fechaCorta(d.fecha), d.turno, d.mano ? 'Mano/grúa ' + d.mano : '', d.apuntador].filter(Boolean).join(' · ');
+    const linea = (nombre, tot) => nombre + ': ' + COLS_CORTAS.map((c, i) => c + ' ' + tot[i]).join(' · ') + ' (' + suma(tot) + ')';
+    const td = totalesDe(t, 'descarga'), tc = totalesDe(t, 'carga');
+    return [cab, linea('DESCARGA', td), linea('CARGA', tc), 'TOTAL movimientos: ' + (suma(td) + suma(tc))].join('\n');
+  }
+  function totalesDe(t, b) {
+    const r = [0, 0, 0, 0, 0, 0];
+    t[b].forEach((fila) => fila.forEach((v, c) => { r[c] += v; }));
+    return r;
+  }
+  async function compartir(t) {
+    const texto = textoResumen(t);
+    if (navigator.share) {
+      try { await navigator.share({ text: texto }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  }
+  $('bCompartir').addEventListener('click', () => compartir(turno));
+
+  // ── PDF / imprimir: rellena la hoja A4 y lanza la impresión ───────────────
+  function construirHoja(t) {
+    const d = t.datos;
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const datos = [['BUQUE', d.buque, 30], ['FECHA', fechaCorta(d.fecha), 16], ['TURNO', d.turno, 12], ['MANO / GRÚA', d.mano, 17], ['APUNTADOR', d.apuntador, 25]]
+      .map(([l, v, w]) => '<div style="flex:0 0 calc(' + w + '% - 2.4mm)"><label>' + l + '</label><span>' + esc(v) + '</span></div>').join('');
+    const cabCols = BLOQUES.map(() => COLS.map((c, i) => '<th' + (i === 0 ? ' class="sep"' : '') + '>' + c + '</th>').join('')).join('');
+    let filas = '';
+    for (let f = 0; f < FILAS; f++) {
+      filas += '<tr class="fila">' + BLOQUES.map((b) => t[b][f].map((v, i) => {
+        const etq = i === 0 && t.etiquetas[b][f] ? '<small>' + esc(t.etiquetas[b][f]) + '</small>' : '';
+        return '<td' + (i === 0 ? ' class="sep"' : '') + '>' + etq + (v ? v : '') + '</td>';
+      }).join('')).join('') + '</tr>';
+    }
+    const tot = BLOQUES.map((b) => totalesDe(t, b).map((v, i) => i === 0
+      ? '<td class="etq sep"><small>TOTAL</small>' + (v ? v : '') + '</td>'
+      : '<td>' + (v ? v : '') + '</td>').join('')).join('');
+    // anchos de columna del PDF v2 (mm): 32.6 · 22.9 · 17.9 · 25.2 · 17.9 · 22.9
+    const anchos = [32.6, 22.9, 17.9, 25.2, 17.9, 22.9];
+    const colgroup = '<colgroup>' + BLOQUES.map(() => anchos.map((w) => '<col style="width:' + w + 'mm">').join('')).join('') + '</colgroup>';
+    $('hoja').innerHTML =
+      '<div class="h-datos">' + datos + '</div>' +
+      '<table class="papel">' + colgroup +
+      '<tr class="grupo"><th colspan="6">DESCARGA</th><th colspan="6" class="sep">CARGA</th></tr>' +
+      '<tr class="cols">' + cabCols + '</tr>' + filas + '<tr class="tot">' + tot + '</tr></table>';
+  }
+  $('bPdf').addEventListener('click', () => { construirHoja(turno); window.print(); });
+
+  // ── Historial y nuevo turno ───────────────────────────────────────────────
+  function tieneDatos(t) { return suma(totalesDe(t, 'descarga')) + suma(totalesDe(t, 'carga')) > 0 || !!t.datos.buque; }
+  function archivarActual() {
+    if (!tieneDatos(turno)) return;
+    const hist = leer(K_HIST, []);
+    turno.guardado = Date.now();
+    hist.unshift(turno);
+    guardar(K_HIST, hist.slice(0, MAX_HIST));
+  }
+  $('bNuevo').addEventListener('click', () => {
+    if (tieneDatos(turno) && !confirm('¿Guardar este turno en el historial y empezar uno nuevo?')) return;
+    archivarActual();
+    const apuntador = turno.datos.apuntador;
+    turno = turnoVacio();
+    turno.datos.apuntador = apuntador; // el nombre del apuntador se conserva
+    sel = null; bloque = 'descarga';
+    persistir(); cargarDatos(); pintar();
+  });
+  function pintarHistorial() {
+    const hist = leer(K_HIST, []);
+    const cont = $('listaHist');
+    cont.innerHTML = '';
+    if (!hist.length) { cont.innerHTML = '<div class="vacio">Todavía no hay turnos guardados.</div>'; return; }
+    hist.forEach((t, i) => {
+      const fila = document.createElement('div'); fila.className = 'hist';
+      const txt = document.createElement('div'); txt.className = 'txt';
+      const b = document.createElement('b'); b.textContent = [t.datos.buque || '(sin buque)', fechaCorta(t.datos.fecha), t.datos.turno ? t.datos.turno.split(' ')[0] : ''].filter(Boolean).join(' · ');
+      const s = document.createElement('span'); s.textContent = 'Descarga ' + suma(totalesDe(t, 'descarga')) + ' · Carga ' + suma(totalesDe(t, 'carga')) + (t.datos.mano ? ' · ' + t.datos.mano : '');
+      txt.appendChild(b); txt.appendChild(s);
+      const acc = document.createElement('div');
+      const bAbrir = document.createElement('button'); bAbrir.textContent = 'Abrir';
+      bAbrir.addEventListener('click', () => {
+        if (tieneDatos(turno) && !confirm('El turno actual se guardará en el historial. ¿Abrir este?')) return;
+        archivarActual();
+        const nuevo = leer(K_HIST, []);
+        const idx = nuevo.findIndex((x) => x.guardado === t.guardado);
+        if (idx >= 0) nuevo.splice(idx, 1);
+        guardar(K_HIST, nuevo);
+        turno = t; delete turno.guardado;
+        sel = null; bloque = 'descarga'; persistir(); cargarDatos(); pintar();
+        $('dlgHistorial').close();
+      });
+      const bComp = document.createElement('button'); bComp.textContent = 'Compartir';
+      bComp.addEventListener('click', () => compartir(t));
+      const bBorrar = document.createElement('button'); bBorrar.textContent = 'Borrar';
+      bBorrar.addEventListener('click', () => {
+        if (!confirm('¿Borrar este turno del historial?')) return;
+        const nuevo = leer(K_HIST, []).filter((x) => x.guardado !== t.guardado);
+        guardar(K_HIST, nuevo); pintarHistorial();
+      });
+      acc.appendChild(bAbrir); acc.appendChild(document.createTextNode(' ')); acc.appendChild(bComp); acc.appendChild(document.createTextNode(' ')); acc.appendChild(bBorrar);
+      fila.appendChild(txt); fila.appendChild(acc);
+      cont.appendChild(fila);
+    });
+  }
+  $('bHistorial').addEventListener('click', () => { pintarHistorial(); $('dlgHistorial').showModal(); });
+  $('bCerrarHist').addEventListener('click', () => $('dlgHistorial').close());
+
+  // ── Arranque ─────────────────────────────────────────────────────────────
+  construirTabla();
+  cargarDatos();
+  pintar();
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
