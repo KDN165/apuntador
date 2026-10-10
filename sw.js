@@ -2,7 +2,7 @@
 // Estrategia: primero la red (así una versión nueva en GitHub se ve al momento);
 // si no hay red, la copia guardada. Al publicar una versión nueva de index.html
 // basta con cambiar el número de CACHE para que los móviles renueven la copia.
-const CACHE = 'apuntador-v1';
+const CACHE = 'apuntador-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html'])));

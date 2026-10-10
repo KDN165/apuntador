@@ -63,6 +63,9 @@
   thead tr.cols th { top: 0; height: 36px; font-size: 10.5px; line-height: 1.1; background: var(--gris-cols); border-bottom: 2px solid var(--linea-fuerte); }
   thead tr.total th, thead tr.total td { position: sticky; top: 36px; z-index: 2; height: 40px; font-size: 18px; font-weight: 800; background: var(--gris-cols); border-bottom: 2px solid var(--linea-fuerte); }
   thead tr.total th.nro { font-size: 9px; letter-spacing: .3px; }
+  thead tr.total td small { display: block; font-size: 9px; font-weight: 600; color: #555; line-height: 1.1; margin-top: -2px; }
+  thead tr.total td.aviso { color: #B00020; }
+  thead tr.total td.aviso small { color: #B00020; }
   tbody td.celda { height: 46px; font-size: 19px; font-weight: 700; cursor: pointer; }
   tbody td.celda:empty::after { content: ""; }
   tbody td.celda.sel { outline: 3px solid var(--amarillo); outline-offset: -3px; background: #FFFBE6; }
@@ -121,6 +124,7 @@
     table.papel tr.tot td { height: 10mm; font-size: 12pt; font-weight: 700; background: #EDEDED; border-top: .9pt solid #000; }
     table.papel tr.tot td.etq { text-align: left; padding-left: 1.2mm; }
     table.papel tr.tot td.etq small { font-size: 6.2pt; color: #666; margin-right: 2mm; vertical-align: top; }
+    table.papel tr.tot td small.raw { display: block; font-size: 6.5pt; font-weight: 400; color: #555; line-height: 1; }
     table.papel .sep { border-left: 1.3pt solid #000 !important; }
   }
 </style>
@@ -200,6 +204,18 @@
   const COLS_CORTAS = ['Contenedores', 'Twin', 'Tapas', 'Remociones', 'Gancho', 'Cajoneras'];
   const BLOQUES = ['descarga', 'carga'];
   const FILAS = 15;
+  // (10/10/2026, regla de Kiko) Movimientos que se pagan por cada columna:
+  //   TWIN: el spreader engancha 2 contenedores por izada y se paga 1,5 por
+  //         izada → total × 0,75; el ,5 sube (el total de twin siempre es par).
+  //   TAPAS: cada tapa son 2 movimientos → total × 2.
+  //   Contenedores, remociones, gancho y cajoneras: 1 a 1.
+  const COL_TWIN = 1, COL_TAPAS = 2;
+  function pagado(col, total) {
+    if (col === COL_TWIN) return Math.round(total * 0.75);
+    if (col === COL_TAPAS) return total * 2;
+    return total;
+  }
+  const esTwinImpar = (total) => total % 2 === 1;
   const K_ACTUAL = 'apuntador.v1.actual';
   const K_HIST = 'apuntador.v1.historial';
   const MAX_HIST = 30;
@@ -261,9 +277,21 @@
       }
     });
     const tot = totales(bloque);
-    document.querySelectorAll('[data-tot]').forEach((td) => { const v = tot[+td.dataset.tot]; td.textContent = v ? v : ''; });
-    $('totDescarga').textContent = suma(totales('descarga')) + ' movimientos';
-    $('totCarga').textContent = suma(totales('carga')) + ' movimientos';
+    document.querySelectorAll('[data-tot]').forEach((td) => {
+      const c = +td.dataset.tot, v = tot[c], p = pagado(c, v);
+      td.textContent = '';
+      td.classList.remove('aviso');
+      if (!v) return;
+      td.appendChild(document.createTextNode(String(p)));
+      if (c === COL_TWIN || c === COL_TAPAS) {
+        const sm = document.createElement('small');
+        sm.textContent = v + ' ' + COLS_CORTAS[c].toLowerCase() + (c === COL_TWIN && esTwinImpar(v) ? ' ¿impar?' : '');
+        td.appendChild(sm);
+        if (c === COL_TWIN && esTwinImpar(v)) td.classList.add('aviso');
+      }
+    });
+    $('totDescarga').textContent = movimientos(totales('descarga')) + ' movimientos';
+    $('totCarga').textContent = movimientos(totales('carga')) + ' movimientos';
     document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('activo', b.dataset.bloque === bloque));
     pintarSeleccion();
     pintarResumen();
@@ -274,6 +302,8 @@
     return t;
   }
   const suma = (arr) => arr.reduce((a, b) => a + b, 0);
+  // total de movimientos pagados de un bloque a partir de sus totales por columna
+  const movimientos = (tot) => tot.reduce((acc, v, c) => acc + pagado(c, v), 0);
 
   function pintarSeleccion() {
     const el = $('seleccion');
@@ -369,9 +399,14 @@
   function textoResumen(t) {
     const d = t.datos;
     const cab = ['APUNTADOR', d.buque, fechaCorta(d.fecha), d.turno, d.mano ? 'Mano/grúa ' + d.mano : '', d.apuntador].filter(Boolean).join(' · ');
-    const linea = (nombre, tot) => nombre + ': ' + COLS_CORTAS.map((c, i) => c + ' ' + tot[i]).join(' · ') + ' (' + suma(tot) + ')';
+    const linea = (nombre, tot) => nombre + ': ' + COLS_CORTAS.map((c, i) => {
+      const p = pagado(i, tot[i]);
+      const conv = (i === COL_TWIN || i === COL_TAPAS) && tot[i] ? tot[i] + ' → ' + p : String(p);
+      return c + ' ' + conv + (i === COL_TWIN && esTwinImpar(tot[i]) ? ' (¡impar!)' : '');
+    }).join(' · ') + ' = ' + movimientos(tot) + ' mov.';
     const td = totalesDe(t, 'descarga'), tc = totalesDe(t, 'carga');
-    return [cab, linea('DESCARGA', td), linea('CARGA', tc), 'TOTAL movimientos: ' + (suma(td) + suma(tc))].join('\n');
+    return [cab, linea('DESCARGA', td), linea('CARGA', tc), 'TOTAL movimientos: ' + (movimientos(td) + movimientos(tc)),
+            '(twin × 0,75 · tapas × 2)'].join('\n');
   }
   function totalesDe(t, b) {
     const r = [0, 0, 0, 0, 0, 0];
@@ -401,9 +436,12 @@
         return '<td' + (i === 0 ? ' class="sep"' : '') + '>' + etq + (v ? v : '') + '</td>';
       }).join('')).join('') + '</tr>';
     }
-    const tot = BLOQUES.map((b) => totalesDe(t, b).map((v, i) => i === 0
-      ? '<td class="etq sep"><small>TOTAL</small>' + (v ? v : '') + '</td>'
-      : '<td>' + (v ? v : '') + '</td>').join('')).join('');
+    const tot = BLOQUES.map((b) => totalesDe(t, b).map((v, i) => {
+      if (i === 0) return '<td class="etq sep"><small>TOTAL</small>' + (v ? v : '') + '</td>';
+      if (!v) return '<td></td>';
+      const raw = (i === COL_TWIN || i === COL_TAPAS) ? '<small class="raw">' + v + ' ' + COLS_CORTAS[i].toLowerCase() + '</small>' : '';
+      return '<td>' + pagado(i, v) + raw + '</td>';
+    }).join('')).join('');
     // anchos de columna del PDF v2 (mm): 32.6 · 22.9 · 17.9 · 25.2 · 17.9 · 22.9
     const anchos = [32.6, 22.9, 17.9, 25.2, 17.9, 22.9];
     const colgroup = '<colgroup>' + BLOQUES.map(() => anchos.map((w) => '<col style="width:' + w + 'mm">').join('')).join('') + '</colgroup>';
